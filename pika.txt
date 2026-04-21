@@ -93,8 +93,127 @@ Important note:
 - To support multiple clients, usually a loop and threads are used.
 */
 
+EXP2  To implement Client/Server using RPC/RMI
+
+Calculator.java
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+
+public interface Calculator extends Remote {
+    int add(int a, int b) throws RemoteException;
+    int subtract(int a, int b) throws RemoteException;
+    int multiply(int a, int b) throws RemoteException;
+    int divide(int a, int b) throws RemoteException;
+}
+
+/*
+ * EXPLANATION:
+ * This file defines the Remote Interface (`Calculator`).
+ * 
+ * 1. It extends `java.rmi.Remote`, which acts as a marker to show that the methods inside can be called remotely.
+ * 2. Every method must throw a `java.rmi.RemoteException` to handle potential network or communication failures.
+ * 3. This acts as a contract/blueprint: the Server will implement these methods, and the Client will call them.
+ */
+
+CalculatorServer.java
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
+
+public class CalculatorServer extends UnicastRemoteObject implements Calculator {
+    private static final long serialVersionUID = 1L;
+
+    public CalculatorServer() throws RemoteException {
+        super();
+    }
+
+    public int add(int a, int b) throws RemoteException {
+        return a + b;
+    }
+
+    public int subtract(int a, int b) throws RemoteException {
+        return a - b;
+    }
+
+    public int multiply(int a, int b) throws RemoteException {
+        return a * b;
+    }
+
+    public int divide(int a, int b) throws RemoteException {
+        if (b == 0)
+            throw new RemoteException("Cannot divide by zero");
+        return a / b;
+    }
+
+    public static void main(String[] args) {
+        try {
+            CalculatorServer obj = new CalculatorServer();
+            Registry registry = LocateRegistry.createRegistry(1100);
+            registry.rebind("Calculator", obj);
+            System.out.println("Server is running...");
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+}
+
+/*
+ * EXPLANATION:
+ * This file is the Server Implementation (`CalculatorServer`).
+ * 
+ * 1. Extending `UnicastRemoteObject` ensures this class can export itself to accept incoming remote calls from clients automatically.
+ * 2. It implements the `Calculator` interface, providing the actual logic for add, subtract, multiply, and divide.
+ * 3. A constructor declaring `RemoteException` is required because `UnicastRemoteObject` constructor throws it.
+ * 4. `LocateRegistry.createRegistry(1100)`: Automatically starts an RMI registry on port 1100, saving us from using the external `rmiregistry` command manually.
+ * 5. `registry.rebind("Calculator", obj)`: Registers our actual implementation object in the registry with the name "Calculator", making it discoverable.
+ */
+
+client1.java
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+
+public class client1 {
+    public static void main(String[] args) {
+        try {
+            Registry registry = LocateRegistry.getRegistry("localhost", 1100);
+            Calculator calc = (Calculator) registry.lookup("Calculator");
+
+            System.out.println("10 + 5 = " + calc.add(10, 5));
+            System.out.println("10 - 5 = " + calc.subtract(10, 5));
+            System.out.println("10 * 5 = " + calc.multiply(10, 5));
+            System.out.println("10 / 5 = " + calc.divide(10, 5));
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+}
+
+/*
+ * EXPLANATION:
+ * This file is the Client Implementation (`client1`).
+ * 
+ * 1. The client doesn't implement the calculations itself; instead, it calls
+ * the `Calculator` server.
+ * 2. `LocateRegistry.getRegistry("localhost", 1100)`: Connects to the RMI
+ * registry running on localhost at port 1100.
+ * 3. `registry.lookup("Calculator")`: Searches the registry for the name we
+ * registered the server under ("Calculator").
+ * 4. It casts the stub/reference returned by the lookup into the `Calculator`
+ * interface.
+ * 5. Then, it invokes `.add`, `.subtract`, etc., exactly as if it were a local
+ * object, abstracting the network communication details behind the interface.
+ */
+
+To run this exp:
+ start rmiregistry
+javac Calculator.java CalculatorServer.java client1.java
+java CalculatorServer
+java client1
 
 
+//deprecated here
 #############################################################################################
 EXP2  To implement Client/Server using RPC/RMI
 
@@ -412,5 +531,147 @@ How this demo runs:
 #####################################################################################################
 
 
+Exp 6 Mutual Exclusion
+
+import time
+
+class Process:
+    def __init__(self, pid, needs_cs=False):
+        self.pid = pid
+        self.needs_cs = needs_cs
+
+    def execute(self):
+        if self.needs_cs:
+            print(f"Process P{self.pid} has the token and enters Critical Section.")
+            time.sleep(1)
+            print(f"Process P{self.pid} exits Critical Section.\n")
+            self.needs_cs = False
+        else:
+            print(f"Process P{self.pid} has the token but does not need Critical Section.\n")
+            time.sleep(0.5) 
+
+def token_ring(processes, cycles):
+    token = 0 # token starts with first process
+    for c in range(cycles):
+        print(f"--- Cycle {c+1} ---")
+        current_process = processes[token]
+        current_process.execute()
+        # pass token to next process in ring
+        token = (token + 1) % len(processes)
+
+# Main program
+if __name__ == "__main__":
+    n = int(input("Enter number of processes: "))
+    processes = []
+    print("Enter 1 if process wants to enter critical section, otherwise 0")
+    for i in range(n):
+        need = int(input(f"Does Process P{i} need CS? (1/0): "))
+        processes.append(Process(i, need == 1))
+    cycles = int(input("Enter number of token cycles: "))
+    token_ring(processes, cycles)
 
 
+"""
+EXPLANATION:
+This code implements the Token Ring Algorithm used for mutual exclusion in distributed systems.
+
+1. Process Class: Represents a node in the ring. Each process has an ID (`pid`) and a flag (`needs_cs`) to indicate if it wishes to enter the Critical Section (CS).
+2. execute() Method: Simulates the process's turn when it receives the token.
+   - If it requested the CS, it "enters" it (simulated by a 1-second pause), finishes its task, exits, and resets its request flag.
+   - If it didn't request the CS, it simply acknowledges holding the token and quickly passes it on.
+3. token_ring() Function: Manages the cyclical passing of the token. It starts at process 0 and iterates through the token cycles. The expression `(token + 1) % len(processes)` ensures that the token loops back to the first process after reaching the last one.
+4. Main Execution: Prompts the user to set up the environment, including the number of processes, which processes require the CS, and the total number of ring cycles to simulate.
+"""
+
+input :
+Enter number of processes: 4
+Enter 1 if process wants to enter critical section, otherwise 0
+Does Process P0 need CS? (1/0): 1
+Does Process P1 need CS? (1/0): 0
+Does Process P2 need CS? (1/0): 1
+Does Process P3 need CS? (1/0): 0
+Enter number of token cycles: 6
+
+
+#Exp 8 :Task ASsignment Approach
+
+def calculate_task_assignment():
+    n = int(input("Enter number of tasks: "))
+    m = int(input("Enter number of processors: "))
+    
+    print("\nEnter execution cost matrix:")
+    exec_cost = []
+    for i in range(n):
+        row = list(map(int, input(f"Enter costs for Task {i} on {m} processors: ").split()))
+        exec_cost.append(row)
+        
+    print("\nEnter communication cost matrix:")
+    comm_cost = []
+    for i in range(n):
+        row = list(map(int, input(f"Enter communication cost for Task {i} with other tasks: ").split()))
+        comm_cost.append(row)
+        
+    print(f"\nEnter assigned processor for each task (0 to {m-1}):")
+    assignment = list(map(int, input().split()))
+    
+    execution_time = 0
+    communication_time = 0
+    
+    # Calculate execution cost
+    for i in range(n):
+        execution_time += exec_cost[i][assignment[i]]
+        
+    # Calculate communication cost
+    for i in range(n):
+        for j in range(i + 1, n):
+            if assignment[i] != assignment[j]:
+                communication_time += comm_cost[i][j]
+                
+    total_assignment_time = execution_time + communication_time
+    
+    print("\nExecution Time =", execution_time)
+    print("Communication Time =", communication_time)
+    print("Total Assignment Time =", total_assignment_time)
+
+# Main
+if __name__ == "__main__":
+    calculate_task_assignment()
+
+"""
+EXPLANATION:
+This code calculates the total cost (time) of a specific assignment of tasks to processors in a distributed system.
+
+1. Input Matrices formulation:
+   - `exec_cost`: Represents the time it takes to execute each task on each processor. Size is (n x m) where n is tasks and m is processors.
+   - `comm_cost`: Represents the communication time penalty if two tasks communicate and run on DIFFERENT processors. Size is typically (n x n).
+
+2. Task Assignment:
+   - The `assignment` array maps each task (by its index) to a specific processor (value).
+
+3. Cost Calculation:
+   - Execution Cost: Adds up the execution time for each task on its assigned processor.
+   - Communication Cost: Adds communication penalties between pairs of tasks only if they are assigned to different processors (`assignment[i] != assignment[j]`).
+
+4. Output: The total assignment time is given by the sum of total execution time and total communication penalties.
+"""
+
+Input:
+Enter number of tasks: 3
+Enter number of processors: 2
+
+Enter execution cost matrix:
+Enter costs for Task 0 on 2 processors: 10 15
+Enter costs for Task 1 on 2 processors: 20 25
+Enter costs for Task 2 on 2 processors: 5 10
+
+Enter communication cost matrix:
+Enter communication cost for Task 0 with other tasks: 0 4 6 
+Enter communication cost for Task 1 with other tasks: 4 0 3
+Enter communication cost for Task 2 with other tasks: 6 3 0 
+
+Enter assigned processor for each task (0 to 1):
+0 1 0
+
+Execution Time = 40
+Communication Time = 7
+Total Assignment Time = 47
