@@ -1,0 +1,416 @@
+Exp1  To implement inter-process communication
+
+import java.io.DataOutputStream;
+import java.net.Socket;
+
+public class MyClient {
+   public static void main(String[] args) {
+        try {
+            Socket s = new Socket("localhost", 6666);
+            DataOutputStream dout = new DataOutputStream(s.getOutputStream());
+            dout.writeUTF("Hello Server");
+            dout.flush();
+            dout.close();
+            s.close();
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+}
+
+/*
+Simple Explanation (Client):
+1) Socket("localhost", 6666): creates a TCP connection from client to server on the same machine.
+    - localhost means "this computer".
+    - 6666 is the port number where the server is listening.
+2) DataOutputStream: wraps the socket output so we can send Java-friendly data types.
+    - It is easier than sending raw bytes manually.
+3) writeUTF("Hello Server"): sends one string message in modified UTF format.
+    - The method includes length information, so receiver knows how many bytes to read.
+4) flush(): pushes any buffered data immediately to the network.
+5) close() calls: closes stream and socket to avoid memory/resource leaks.
+    - If not closed, program may keep unused connections open.
+
+How it works:
+- Start server first.
+- Run client.
+- Client connects, sends one message, and exits.
+
+Data Flow:
+- Client side: String -> writeUTF -> bytes on socket.
+- Server side: bytes on socket -> readUTF -> String.
+
+Important note:
+- This client sends only one message and then stops.
+- For chat-like communication, you would use a loop.
+*/
+
+
+import java.io.DataInputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class MyServer {
+    public static void main(String[] args) {
+        try {
+            ServerSocket ss = new ServerSocket(6666);
+            Socket s = ss.accept(); // establishes connection
+            DataInputStream dis = new DataInputStream(s.getInputStream());
+            String str = dis.readUTF();
+            System.out.println("message = " + str);
+            ss.close();
+
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+}
+
+/*
+Simple Explanation (Server):
+1) ServerSocket(6666): starts a TCP server and binds it to port 6666.
+    - This makes the server ready to accept incoming client connections.
+2) accept(): blocks (waits) until some client connects.
+    - After connection, it returns a Socket dedicated to that client.
+3) DataInputStream: wraps socket input to easily read Java data types.
+4) readUTF(): receives the string sent by client using writeUTF.
+    - This is why both client and server should use matching methods.
+5) println: prints received message to console.
+6) close(): closes the server socket and releases network resources.
+
+How it works:
+- Server starts and waits.
+- Client connects and sends "Hello Server".
+- Server reads and prints that message, then program ends.
+
+Data Flow:
+- Server is passive first (waiting at accept).
+- After connection, it reads incoming bytes and converts to string.
+
+Important note:
+- This server handles only one client and one message.
+- To support multiple clients, usually a loop and threads are used.
+*/
+
+
+
+#############################################################################################
+EXP2  To implement Client/Server using RPC/RMI
+
+import xmlrpc.client
+proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
+
+a = 10
+b = 20
+sum_result = proxy.add(a, b)
+sub_result = proxy.sub(a, b)
+mul_result = proxy.mul(a, b)
+
+print(f"Sum= {sum_result}")
+print(f"Sub = {sub_result}")
+print(f"Mul = {mul_result}")
+
+"""
+Simple Explanation (Client):
+1) xmlrpc.client.ServerProxy("http://localhost:8000/") creates a remote connection object.
+	 - It lets this program call server functions as if they were local Python methods.
+2) a and b are normal input values sent to the server.
+3) proxy.add(a, b) calls the RPC method named "add" on the server.
+4) The server computes result and sends it back over HTTP/XML-RPC.
+5) print(...) shows the returned value on client side.
+
+Should we include sub and mul also?
+- Yes, because your server already provides them.
+- You can test them the same way:
+	diff_result = proxy.sub(a, b)
+	prod_result = proxy.mul(a, b)
+	print(f"Sub = {diff_result}")
+	print(f"Mul = {prod_result}")
+
+How it works:
+- Start server first.
+- Run client.
+- Client sends request -> server processes -> server returns response.
+"""
+
+from xmlrpc.server import SimpleXMLRPCServer
+
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+def mul(a, b):
+    return a * b
+
+server = SimpleXMLRPCServer(("localhost", 8000), allow_none=True)
+print("RPC Server running on port 8000...")
+server.register_function(add, "add")
+server.register_function(sub, "sub")
+server.register_function(mul, "mul")
+
+server.serve_forever()
+
+"""
+Simple Explanation (Server):
+1) add, sub, mul are normal Python functions for arithmetic operations.
+2) SimpleXMLRPCServer(("localhost", 8000), allow_none=True) starts an RPC server.
+    - localhost means this machine.
+    - 8000 is the server port.
+3) register_function(function, "name") exposes each function as an RPC method.
+    - "add" can be called by client as proxy.add(...)
+    - "sub" can be called by client as proxy.sub(...)
+    - "mul" can be called by client as proxy.mul(...)
+4) serve_forever() keeps server running and listening for requests continuously.
+
+How request/response flow works:
+- Client sends method name + arguments in XML format over HTTP.
+- Server matches method name to registered function.
+- Function runs and return value is sent back to client.
+
+Important note:
+- If client calls a method not registered here (example: sum_numbers),
+  server returns a fault: method is not supported.
+"""
+
+
+#############################################################################################
+exp3 To implement Group Communication
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
+
+public class GroupSender {
+    public static void main(String[] args) throws IOException {
+        MulticastSocket socket = new MulticastSocket();
+
+       
+        InetAddress address = InetAddress.getByName("230.0.0.1");
+        int port = 5000;
+
+        String message = "Hello, group!";
+        byte[] data = message.getBytes();
+
+ 
+        DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
+
+    
+        socket.send(packet);
+                  socket.close();
+    }
+}
+
+/*
+Simple Explanation (GroupSender):
+1) MulticastSocket socket = new MulticastSocket();
+    - Creates a UDP socket used to send multicast packets.
+2) InetAddress.getByName("230.0.0.1"):
+    - Defines the multicast group IP address.
+3) int port = 5000:
+    - Defines the group port where receivers are listening.
+4) message.getBytes():
+    - Converts text message into bytes for network transfer.
+5) DatagramPacket(...):
+    - Wraps data + destination address + destination port into one packet.
+6) socket.send(packet):
+    - Sends the message to all receivers that joined this multicast group.
+7) socket.close():
+    - Releases socket resources after sending.
+
+How it works:
+- Sender does not connect to a single client.
+- It sends one UDP packet to the multicast group address.
+- Any active receiver in that group can get the message.
+
+Important note:
+- This sender sends only one message and exits.
+- For continuous sending, put message creation and send in a loop.
+*/
+
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
+import java.net.NetworkInterface;
+
+public class GroupReceiver {
+    public static void main(String[] args) throws IOException {
+        int port = 5000;
+        InetAddress groupIp = InetAddress.getByName("230.0.0.1");
+        InetSocketAddress group = new InetSocketAddress(groupIp, port);
+
+        // Pick the interface you want to receive multicast on
+        NetworkInterface nif = NetworkInterface.getByInetAddress(InetAddress.getLocalHost());
+
+        try (MulticastSocket socket = new MulticastSocket(port)) {
+            socket.joinGroup(group, nif);
+
+            while (true) {
+                byte[] data = new byte[1024];
+                DatagramPacket packet = new DatagramPacket(data, data.length);
+                socket.receive(packet);
+                String message = new String(packet.getData(), 0, packet.getLength());
+                System.out.println("Received message: " + message);
+            }
+        }
+    }
+}
+
+/*
+Simple Explanation (GroupReceiver):
+1) groupIp and port define which multicast group to listen to.
+2) InetSocketAddress group = new InetSocketAddress(groupIp, port):
+    - Creates a socket address for the multicast group.
+3) NetworkInterface nif = NetworkInterface.getByInetAddress(InetAddress.getLocalHost()):
+    - Selects a network interface used for joining the multicast group.
+4) MulticastSocket socket = new MulticastSocket(port):
+    - Opens receiver socket and binds it to port 5000.
+5) socket.joinGroup(group, nif):
+    - Joins multicast group using modern API (non-deprecated).
+6) socket.receive(packet):
+    - Waits for incoming UDP multicast packet.
+7) new String(packet.getData(), 0, packet.getLength()):
+    - Converts received bytes back into readable message text.
+
+How it works:
+- Start receiver first so it can join the group.
+- Run sender to transmit message.
+- Receiver gets packet and prints it.
+
+Important note:
+- while (true) keeps receiver running continuously.
+- Stop manually (for example, Ctrl+C) when done.
+*/
+
+#############################################################################################
+Exp5  To Implement Election Algorithm
+
+class BullyElection:
+  def __init__(self, processes):
+    self.processes = processes  # list of process IDs
+    self.alive = {p: True for p in processes}
+    self.coordinator = max(processes)
+
+  def crash(self, pid):
+    self.alive[pid] = False
+    print(f"Process {pid} crashed.")
+
+  def start_election(self, pid):
+    print(f"\nProcess {pid} starts election")
+    higher = [p for p in self.processes if p > pid and self.alive[p]]
+
+    if not higher:
+      self.coordinator = pid
+      print(f"Process {pid} becomes new Coordinator")
+    else:
+      print(f"Process {pid} sends Election to {higher}")
+      new_leader = max(higher)
+      self.start_election(new_leader)
+
+  def show_coordinator(self):
+    print("Current Coordinator:", self.coordinator)
+
+
+processes = [1, 2, 3, 4, 5]
+bully = BullyElection(processes)
+bully.show_coordinator()
+bully.crash(5)  # coordinator crashes
+bully.start_election(2)
+bully.show_coordinator()
+
+
+"""
+Simple Explanation (Bully Election):
+1) Every process has a unique ID. Highest alive ID should be coordinator.
+2) __init__ stores all process IDs, marks all as alive, and picks highest as initial coordinator.
+3) crash(pid) marks a process as failed.
+4) start_election(pid) is called when a process starts election.
+   - It checks alive processes with higher IDs.
+   - If none exist, current process becomes coordinator.
+   - If higher processes exist, highest one continues election.
+5) show_coordinator() prints the current coordinator.
+
+How this demo runs:
+- Initial coordinator is process 5.
+- Process 5 crashes.
+- Process 2 starts election.
+- Election moves upward and process 4 becomes new coordinator.
+"""
+
+Ring election;
+# Ring Election Algorithm Simulation
+
+class RingElection:
+	def __init__(self, processes):
+		self.processes = processes
+		self.alive = {p: True for p in processes}
+		self.coordinator = max(processes)
+
+	def crash(self, pid):
+		self.alive[pid] = False
+		print(f"Process {pid} crashed.")
+
+	def start_election(self, starter):
+		print(f"\nProcess {starter} starts election")
+
+		active_list = []
+		n = len(self.processes)
+		index = self.processes.index(starter)
+
+		for i in range(n):
+			pid = self.processes[(index + i) % n]
+			if self.alive[pid]:
+				active_list.append(pid)
+
+		print("Active Processes:", active_list)
+
+		new_leader = max(active_list)
+		self.coordinator = new_leader
+		print(f"Process {new_leader} elected as Coordinator")
+
+	def show_coordinator(self):
+		print("Current Coordinator:", self.coordinator)
+
+
+
+
+# Example
+processes = [1, 2, 3, 4]
+ring = RingElection(processes)
+ring.show_coordinator()
+ring.crash(4)
+ring.start_election(2)
+
+
+ring.show_coordinator()
+
+
+"""
+Simple Explanation (Ring Election):
+1) Every process has a unique ID and they are logically arranged in a ring.
+2) __init__ stores process IDs, marks all as alive, and sets highest ID as initial coordinator.
+3) crash(pid) marks a process as failed.
+4) start_election(starter) begins election from one process.
+5) The algorithm traverses processes in ring order starting from starter.
+6) Only alive processes are collected in active_list.
+7) Highest ID from active_list is elected as the new coordinator.
+8) show_coordinator() displays current coordinator.
+
+How this demo runs:
+- Initial coordinator is 4.
+- Process 4 crashes.
+- Process 2 starts election.
+- Active processes become [2, 3, 1].
+- Process 3 is elected as new coordinator.
+"""
+#####################################################################################################
+
+
+
+
