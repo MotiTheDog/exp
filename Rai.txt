@@ -1,0 +1,729 @@
+
+################################################################################
+#                         DATA MINING PRACTICALS                               #
+#                        ALL EXPERIMENTS - COMBINED                            #
+################################################################################
+
+
+################################################################################
+#                  EXPERIMENT 1 - DESCRIPTIVE STATISTICS & BMI                #
+################################################################################
+
+import pandas as pd 
+import seaborn as sns
+import matplotlib.pyplot as plt 
+from scipy.stats import skew , kurtosis 
+
+df=pd.read_csv("exp1_bmi.csv")
+
+num_df = df.select_dtypes(include="number")
+num_df = num_df.fillna(num_df.mean())
+
+#central tedency
+print("Mean: \n",num_df.mean())
+print("Median: \n",num_df.median())
+print("Mode: \n",df.mode().iloc[0])
+
+#dispersion
+print("Var: \n",num_df.var())
+print("SD : \n",num_df.std())
+print("Range : \n",num_df.max() - num_df.min())
+print("IQR : \n",num_df.quantile(0.75)-num_df.quantile(0.25))
+
+#shape
+print("Skweness: \n",num_df.apply(skew))
+print("Kurtosis: \n",num_df.apply(kurtosis))
+
+#boxplot
+sns.boxplot(data=num_df)
+plt.xticks(rotation=45)
+plt.show()
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 1
+==============================================================================
+This experiment performs Descriptive Statistics on a BMI dataset.
+
+STEPS:
+1. Load Dataset:
+   - Read the CSV file using pandas.
+   - Select only numerical columns using select_dtypes().
+   - Fill missing values with column mean using fillna().
+
+2. Central Tendency:
+   - Mean   : Average value of each column.
+   - Median : Middle value when data is sorted.
+   - Mode   : Most frequently occurring value.
+
+3. Measures of Dispersion:
+   - Variance (var)  : How spread out the data is from the mean.
+   - Std Deviation   : Square root of variance; more interpretable.
+   - Range           : Max - Min; total spread of data.
+   - IQR             : 75th percentile - 25th percentile; middle 50% spread.
+
+4. Shape of Distribution:
+   - Skewness : Measures asymmetry of data distribution.
+                Positive skew = tail on right, Negative skew = tail on left.
+   - Kurtosis : Measures the "peakedness" of the distribution.
+                High kurtosis = sharp peak, Low kurtosis = flat distribution.
+
+5. Boxplot:
+   - Visual representation showing median, IQR, and outliers for each column.
+==============================================================================
+"""
+
+
+################################################################################
+#         EXPERIMENT 2 - DATA PREPROCESSING (Dataset 1: Country-Age-Salary)   #
+################################################################################
+
+import pandas as pd
+import numpy as np
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder , LabelEncoder ,StandardScaler
+from sklearn.model_selection import train_test_split
+
+ds = pd.read_csv("exp2_CountryAgeSalary.csv")
+x = ds.iloc[:,:-1].values
+y = ds.iloc[:,-1].values
+
+imputer = SimpleImputer(missing_values=np.nan,strategy="mean")
+x[:,1:3] = imputer.fit_transform(x[:,1:3]).round(2)
+print(x)
+
+ct = ColumnTransformer(
+  transformers=[("encoder",OneHotEncoder(),[0])],
+  remainder="passthrough"
+)
+x=np.array(ct.fit_transform(x))
+print(x)
+
+le = LabelEncoder()
+y = le.fit_transform(y)
+print(y)
+
+x_train , x_test , y_train , y_test = train_test_split(
+  x,y, test_size=0.2 , random_state=0
+)
+print(x_train,"\n")
+print(x_test)
+
+#scaler object  -->  used to normalize the values 
+sc = StandardScaler()
+x_train[:,3:] = sc.fit_transform(x_train[:,3:])
+print(x_train,"\n")
+
+x_test[:, 3:] = sc.fit_transform(x_test[:, 3:])
+print(x_test)
+
+result = pd.DataFrame(x)
+result["target_encoded"] = y
+print(result)
+
+result.to_csv("exp2_preprocessed_result.csv", index=False)
+print("CSV saved as: exp2_preprocessed_result.csv")
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 2 (Dataset 1)
+==============================================================================
+This experiment covers complete Data Preprocessing on Country-Age-Salary data.
+
+STEPS:
+1. Load Dataset:
+   - Separate features (X = all columns except last) and target (y = last column).
+
+2. Handle Missing Values:
+   - SimpleImputer fills NaN values in Age and Salary columns with their mean.
+
+3. Encode Categorical Data (Input - X):
+   - OneHotEncoder converts the Country column (categorical) into binary columns.
+     Example: France → [1,0,0], Germany → [0,1,0], Spain → [0,0,1]
+   - ColumnTransformer applies encoding only to column 0 (Country), 
+     keeping other columns as-is (remainder="passthrough").
+
+4. Encode Target Variable (y):
+   - LabelEncoder converts text labels like "Yes"/"No" into numbers (0/1).
+
+5. Train-Test Split:
+   - 80% data for training, 20% for testing.
+   - random_state=0 ensures reproducibility.
+
+6. Feature Scaling:
+   - StandardScaler normalizes numerical features so they have mean=0, std=1.
+   - Prevents larger-valued columns from dominating the model.
+   - fit_transform() on train data, transform() on test data (fit only on train).
+
+7. Save Result:
+   - Final preprocessed data is saved as a CSV file.
+==============================================================================
+"""
+
+
+################################################################################
+#        EXPERIMENT 2 (2nd Dataset) - DATA CLEANING (Employee Dataset)        #
+################################################################################
+
+import numpy as np 
+import pandas as pd 
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder , LabelEncoder , StandardScaler
+from sklearn.model_selection import train_test_split
+
+df = pd.read_csv("DATA-CLEANING-EXT2-DATASET.csv")
+print("Original data",df)
+
+df = df.drop(index=9).drop_duplicates("ID",keep="last").reset_index(drop=True)
+
+df.loc[df["Age"] <= 0, "Age"] = np.nan
+df["Gender"] = df["Gender"].replace({"M":"Male","F":"Female", "Unknown": np.nan})
+df["Joining_Date"] = pd.to_datetime(df["Joining_Date"],errors="coerce",format="mixed")
+
+df[["Age","Salary"]] = SimpleImputer(strategy="mean").fit_transform(df[["Age","Salary"]])
+df[["Gender","Joining_Date"]] = SimpleImputer(strategy="most_frequent").fit_transform(df[["Gender","Joining_Date"]])
+df["Joining_Date"] = pd.to_datetime(df["Joining_Date"]).dt.strftime("%Y-%m-%d")
+
+
+x = df[["Age","Gender","Salary","Joining_Date"]]
+y = LabelEncoder().fit_transform(df["Department"])
+
+x = ColumnTransformer([("gender",OneHotEncoder(drop="first"),[1])], remainder="passthrough").fit_transform(x)
+
+x_train , x_test , y_train , y_test = train_test_split(x,y, test_size=0.2,random_state=0)
+
+sc = StandardScaler()
+x_train[:,[1,2]] = sc.fit_transform(x_train[:,[1,2]])
+x_test[:,[1,2]] = sc.transform(x_test[:,[1,2]])
+
+print("Cleaned Dataset : \n",df)
+print("x_train: \n",x_train)
+print("x_test: \n",x_test)
+print("y_train: ",y_train)
+print("y_test: ",y_test)
+
+res = pd.DataFrame(x)
+res["target_encoded"]=y
+print(res)
+
+res.to_csv("exp2_2n_dataset_res.csv",index=False)
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 2 (Dataset 2)
+==============================================================================
+This experiment performs thorough Data Cleaning on an Employee dataset.
+
+STEPS:
+1. Load and Display Original Data.
+
+2. Data Cleaning:
+   - Drop row at index 9 (bad/irrelevant row).
+   - Remove duplicate rows based on "ID" column, keeping the last entry.
+   - Replace invalid Age values (<=0) with NaN for proper handling.
+   - Standardize Gender values: "M" → "Male", "F" → "Female", "Unknown" → NaN.
+   - Parse Joining_Date to proper datetime format (handles mixed formats).
+
+3. Impute Missing Values:
+   - Age and Salary: filled with column mean (numerical).
+   - Gender and Joining_Date: filled with most frequent value (categorical).
+   - Joining_Date reformatted to "YYYY-MM-DD" string after imputation.
+
+4. Feature/Target Separation:
+   - X: Age, Gender, Salary, Joining_Date.
+   - y: Department column label-encoded into numbers.
+
+5. Encoding and Splitting:
+   - OneHotEncoder on Gender (drop="first" avoids dummy variable trap).
+   - 80-20 Train-Test split.
+
+6. Feature Scaling:
+   - StandardScaler on Age and Salary columns only.
+   - sc.transform() (not fit_transform) used on test data to avoid data leakage.
+
+7. Save Result to CSV.
+==============================================================================
+"""
+
+
+################################################################################
+#          EXPERIMENT 3 - HYPOTHESIS TESTING (One-Sample T-Test)              #
+################################################################################
+
+import pandas as pd
+from scipy.stats import ttest_1samp
+
+# Load dataset
+df2 = pd.read_csv("exp3_RelianceDataMart.csv")
+
+# Display column names (to verify)
+print("Columns in dataset:", df2.columns)
+
+# -----------------------------
+# 1. One-Sample T-Test
+# (Testing if mean weight = 500)
+# -----------------------------
+t_stat, p_val = ttest_1samp(df2['Rice_Bag_Weight'], 500)
+
+print("\nOne-Sample T-Test (Rice_Bag_Weight vs 500):")
+print("t =", t_stat)
+print("p =", p_val)
+
+# -----------------------------
+# Interpretation
+# -----------------------------
+alpha = 0.05
+
+if p_val < alpha:
+    print("Result: Reject Null Hypothesis (Mean is NOT equal to 500)")
+else:
+    print("Result: Fail to Reject Null Hypothesis (Mean is approximately 500)")
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 3
+==============================================================================
+This experiment performs Hypothesis Testing using a One-Sample T-Test.
+
+CONCEPT:
+- Null Hypothesis (H0)     : Mean weight of Rice Bag = 500
+- Alternate Hypothesis (H1): Mean weight of Rice Bag ≠ 500
+
+STEPS:
+1. Load the Reliance DataMart dataset.
+
+2. One-Sample T-Test:
+   - ttest_1samp() compares the sample mean to a known/hypothesized value (500).
+   - Returns: t-statistic and p-value.
+     * t-statistic: How far the sample mean is from 500 (in standard errors).
+     * p-value: Probability of observing this result if H0 is true.
+
+3. Decision Rule (alpha = 0.05):
+   - If p-value < 0.05 → Reject H0 (Mean is significantly different from 500).
+   - If p-value >= 0.05 → Fail to Reject H0 (No significant difference found).
+
+USE CASE:
+   A retail store wants to verify whether rice bags actually weigh 500g as labeled.
+==============================================================================
+"""
+
+
+################################################################################
+#          EXPERIMENT 4 - DATA VISUALIZATION (Tips Dataset)                   #
+################################################################################
+
+import pandas as pd 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
+
+df = pd.read_csv("tips-expt4 - tips-expt4.csv")
+print(df.isnull().sum())
+
+##extra
+# Handle missing values
+df["total_bill"] = df["total_bill"].fillna(df["total_bill"].median())
+df["tip"] = df["tip"].fillna(df["tip"].median())
+df["sex"] = df["sex"].fillna(df["sex"].mode()[0])
+df["smoker"] = df["smoker"].fillna(df["smoker"].mode()[0])
+df["day"] = df["day"].fillna(df["day"].mode()[0])
+df["time"] = df["time"].fillna(df["time"].mode()[0])
+df["size"] = df["size"].fillna(df["size"].median())
+
+#remove duplicate rows
+print(df.drop_duplicates(inplace=True))
+
+#Countplot for gender 
+sns.countplot(x="sex",data=df)
+plt.title("Gender Count")
+plt.show()
+
+#countplot for smoke vs gender 
+sns.countplot(x="smoker",hue="sex",data=df)
+plt.title("smoker vs Gender")
+plt.show()
+
+#countplot for day vs time 
+sns.countplot(x="day", hue="time",data=df)
+plt.title("Day vs Time")
+plt.show()
+
+#histogram for total bill
+sns.histplot(df["total_bill"],kde=True,bins=30)
+plt.title("Total Bill Distribution")
+plt.show()
+#kde --> smooth distribution line
+
+sns.histplot(df["tip"],kde=True,bins=30)
+plt.title("Tip Distribution")
+plt.show()
+
+plt.figure(figsize=(8,6))
+sns.heatmap(df.corr(numeric_only=True),annot=True,cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+
+plt.figure(figsize=(8, 5))
+sns.scatterplot(x="total_bill", y="tip",data=df)
+plt.title("Total Bill vs Tip")
+plt.show()
+
+# NOTE: The "Handle missing values" block above is marked as ##extra
+#       Comment it out if the dataset has no missing values.
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 4
+==============================================================================
+This experiment covers Data Visualization using the Tips restaurant dataset.
+
+STEPS:
+1. Load Dataset and check for missing values using isnull().sum().
+
+2. Handle Missing Values (marked ##extra - comment out if not needed):
+   - Numerical columns (total_bill, tip, size): filled with median.
+   - Categorical columns (sex, smoker, day, time): filled with mode.
+
+3. Remove Duplicates using drop_duplicates().
+
+4. Visualizations:
+   a) Countplot - Gender:
+      Shows how many male vs female customers visited.
+
+   b) Countplot - Smoker vs Gender:
+      Shows smoker/non-smoker split within each gender (hue="sex").
+
+   c) Countplot - Day vs Time:
+      Shows which days had lunch vs dinner visits.
+
+   d) Histogram - Total Bill:
+      Distribution of total bill amounts with KDE (smooth curve overlay).
+      KDE = Kernel Density Estimate, shows the shape of distribution.
+
+   e) Histogram - Tip:
+      Distribution of tip amounts with KDE curve.
+
+   f) Heatmap - Correlation Matrix:
+      Shows how strongly numerical columns are related.
+      Values close to 1 or -1 = strong correlation.
+      "coolwarm" colormap: red = positive, blue = negative correlation.
+
+   g) Scatter Plot - Total Bill vs Tip:
+      Shows whether higher bills lead to higher tips (relationship check).
+==============================================================================
+"""
+
+
+################################################################################
+#    EXPERIMENT 5 - LOGISTIC REGRESSION WITH SMOTE (Admission Dataset)        #
+################################################################################
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from imblearn.over_sampling import SMOTE
+
+# load dataset
+df = pd.read_excel("exp5_Admission_St.xlsx")
+
+# features and target
+X = df.drop("Admit", axis=1) #axis 0 --> row and axis 1 -->columnn
+y = df["Admit"]
+
+# split dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+# model before SMOTE
+model1 = LogisticRegression(max_iter=2000)
+model1.fit(X_train, y_train)
+pred1 = model1.predict(X_test)
+
+print("Before SMOTE")
+print("Accuracy:", accuracy_score(y_test, pred1))
+print("Precision:", precision_score(y_test, pred1))
+print("Recall:", recall_score(y_test, pred1))
+print("F1 Score:", f1_score(y_test, pred1))
+
+# apply SMOTE
+smote = SMOTE(random_state=42)
+X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
+
+# model after SMOTE
+model2 = LogisticRegression(max_iter=2000)
+model2.fit(X_train_sm, y_train_sm)
+pred2 = model2.predict(X_test)
+
+print("After SMOTE")
+print("Accuracy:", accuracy_score(y_test, pred2))
+print("Precision:", precision_score(y_test, pred2))
+print("Recall:", recall_score(y_test, pred2))
+print("F1 Score:", f1_score(y_test, pred2))
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 5
+==============================================================================
+This experiment applies Logistic Regression on an imbalanced Admission dataset
+and uses SMOTE to handle class imbalance.
+
+STEPS:
+1. Load Excel Dataset and define features (X) and target (y = "Admit").
+
+2. Train-Test Split:
+   - 75% training, 25% testing.
+   - stratify=y ensures both classes are proportionally represented in splits.
+
+3. Model Before SMOTE:
+   - Train Logistic Regression on the original (possibly imbalanced) data.
+   - Evaluate using 4 metrics:
+     * Accuracy  : Overall correct predictions / total predictions.
+     * Precision : Of all predicted positive, how many are actually positive.
+     * Recall    : Of all actual positives, how many were correctly predicted.
+     * F1 Score  : Harmonic mean of Precision and Recall (balances both).
+
+4. Apply SMOTE (Synthetic Minority Over-sampling Technique):
+   - Generates synthetic samples for the minority class in training data.
+   - Fixes class imbalance so the model doesn't bias toward majority class.
+   - Applied only on training data (never on test data).
+
+5. Model After SMOTE:
+   - Retrain Logistic Regression on the balanced dataset.
+   - Compare metrics: Usually Recall and F1 improve significantly after SMOTE.
+
+KEY INSIGHT:
+   Without SMOTE, model may get high accuracy but poor recall (misses minority).
+   After SMOTE, recall improves because model has learned the minority class better.
+==============================================================================
+"""
+
+
+################################################################################
+#          EXPERIMENT 6 - OUTLIER DETECTION & REMOVAL (Tips Dataset)          #
+################################################################################
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# 1. Load Dataset
+df = pd.read_csv("tips-expt4 - tips-expt4.csv")
+print("Original Dataset Shape:", df.shape)
+print(df[['total_bill', 'tip']].describe())
+
+numerical_cols = ['total_bill', 'tip']
+
+# 2. Identify Outliers using IQR
+outlier_indices = []
+
+for col in numerical_cols:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+    col_outliers = df[(df[col] < lower) | (df[col] > upper)].index
+    print(f"\n{col} → Lower: {lower:.2f}, Upper: {upper:.2f}, Outliers: {len(col_outliers)}")
+    outlier_indices.extend(col_outliers)
+
+outlier_indices = list(set(outlier_indices))
+print(f"\nTotal unique outlier rows: {len(outlier_indices)}")
+
+# 3. Remove Outliers
+df_clean = df.drop(outlier_indices).reset_index(drop=True)
+print("Cleaned Dataset Shape:", df_clean.shape)
+
+# 4. Evaluate Performance (Compare stats before vs after)
+print("\n--- Performance Evaluation ---")
+print("\nBefore Outlier Removal:")
+print(df[numerical_cols].describe().round(2))
+
+print("\nAfter Outlier Removal:")
+print(df_clean[numerical_cols].describe().round(2))
+
+# 5. Visualize — Boxplot before vs after
+plt.figure(figsize=(10, 5))
+
+plt.subplot(1, 2, 1)
+sns.boxplot(data=df[numerical_cols])
+plt.title("Before Outlier Removal")
+
+plt.subplot(1, 2, 2)
+sns.boxplot(data=df_clean[numerical_cols])
+plt.title("After Outlier Removal")
+
+plt.tight_layout()
+plt.show()
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 6
+==============================================================================
+This experiment identifies and removes Outliers from the Tips dataset using
+the IQR (Interquartile Range) method.
+
+STEPS:
+1. Load Dataset and print basic statistics using describe().
+
+2. Identify Outliers using IQR Method:
+   - Q1 = 25th percentile, Q3 = 75th percentile.
+   - IQR = Q3 - Q1 (the middle 50% of data spread).
+   - Lower Bound = Q1 - 1.5 * IQR
+   - Upper Bound = Q3 + 1.5 * IQR
+   - Any value outside [Lower, Upper] is an OUTLIER.
+   - Done for both 'total_bill' and 'tip' columns.
+   - Unique outlier row indices collected (set() removes duplicates).
+
+3. Remove Outliers:
+   - Drop outlier rows from dataframe.
+   - Reset index for clean sequential indexing.
+
+4. Performance Evaluation:
+   - Compare describe() output before and after removal.
+   - After removal: mean, std, and max values should be less extreme.
+
+5. Visualization - Boxplot Comparison:
+   - Side-by-side boxplots before and after outlier removal.
+   - After removal: no dots (outlier points) visible outside the whiskers.
+   - Confirms successful outlier removal visually.
+
+WHY REMOVE OUTLIERS?
+   Outliers skew statistical measures and degrade model performance.
+   Clean data leads to more reliable analysis and better predictions.
+==============================================================================
+"""
+
+
+################################################################################
+#       EXPERIMENT 7 - TIME SERIES FORECASTING (COVID-19 Cases - RF)          #
+################################################################################
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+
+# 1. Load and Prepare Data
+df = pd.read_csv('/content/Expt-7_time_series_covid19 (2).csv')
+date_cols = df.columns[11:]
+ts = pd.DataFrame({
+    'Date': pd.to_datetime(date_cols, format='%m/%d/%y'),
+    'Cases': df[date_cols].sum().values
+}).sort_values('Date')
+
+# 2. Feature Engineering (Lags)
+for i in [1, 2, 3, 7]:
+    ts[f'lag_{i}'] = ts['Cases'].shift(i)
+ts = ts.dropna()
+
+# 3. Split and Train
+X = ts[['lag_1', 'lag_2', 'lag_3', 'lag_7']]
+y = ts['Cases']
+split = int(len(ts) * 0.8)
+X_train, X_test = X.iloc[:split], X.iloc[split:]
+y_train, y_test = y.iloc[:split], y.iloc[split:]
+
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# 4. Predict and Evaluate
+y_pred = model.predict(X_test)
+print(f"MAE: {mean_absolute_error(y_test, y_pred):.2f}")
+
+plt.figure(figsize=(10, 4))
+plt.plot(ts['Date'].iloc[split:], y_test, label='Actual')
+plt.plot(ts['Date'].iloc[split:], y_pred, label='Predicted')
+plt.title("COVID-19 Forecasting (RF)")
+plt.legend()
+plt.show()
+
+# 5. Future Forecasting
+future_predictions = []
+# Note: To project forward, we'll use the most recent 7-day window
+last_known_cases = ts['Cases'].iloc[-7:].tolist()
+
+for _ in range(7):
+    # Create feature row for prediction using the same lags as training: 1, 2, 3, 7
+    # last_known_cases[-1] is lag_1, [-2] is lag_2, [-3] is lag_3, [0] is lag_7
+    x_feat = pd.DataFrame([[last_known_cases[-1], last_known_cases[-2], last_known_cases[-3], last_known_cases[0]]], 
+                          columns=['lag_1', 'lag_2', 'lag_3', 'lag_7'])
+    
+    pred = model.predict(x_feat)[0]
+    future_predictions.append(pred)
+    
+    # Update the window: remove oldest, add new prediction
+    last_known_cases.pop(0)
+    last_known_cases.append(pred)
+
+# Create future dates
+future_dates = pd.date_range(start=ts['Date'].iloc[-1] + pd.Timedelta(days=1), periods=7)
+
+# 6. Visualize Historical vs Future
+plt.figure(figsize=(12, 5))
+plt.plot(ts['Date'], ts['Cases'], label='Historical Data', color='blue')
+plt.plot(future_dates, future_predictions, label='Future Forecast', color='red', linestyle='--', marker='o')
+plt.title("COVID-19 Cases: Historical Data and Future Forecast")
+plt.xlabel("Date")
+plt.ylabel("Total Cases")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+"""
+==============================================================================
+EXPLANATION - EXPERIMENT 7
+==============================================================================
+This experiment performs Time Series Forecasting on COVID-19 global case data
+using a Random Forest Regressor with lag-based feature engineering.
+
+STEPS:
+1. Load and Prepare Data:
+   - Dataset has date columns from column index 11 onwards.
+   - Aggregate (sum) cases across all countries for each date.
+   - Create a time-series DataFrame with 'Date' and 'Cases' columns.
+
+2. Feature Engineering - Lag Features:
+   - Lag features capture historical values as inputs to predict future values.
+   - lag_1: yesterday's cases, lag_2: 2 days ago, lag_3: 3 days ago,
+     lag_7: 7 days ago (one week back).
+   - Rows with NaN (due to shifting) are dropped.
+
+3. Train-Test Split:
+   - First 80% of time-ordered data = training set.
+   - Last 20% = test set.
+   - Note: Random splitting is NOT used here (would break time order).
+
+4. Model Training:
+   - RandomForestRegressor with 100 decision trees trained on lag features.
+   - Model learns patterns between past cases and future cases.
+
+5. Prediction and Evaluation:
+   - Predict on test set and compute MAE (Mean Absolute Error).
+   - MAE = average absolute difference between predicted and actual values.
+   - Plot Actual vs Predicted cases for visual comparison.
+
+6. Future Forecasting (7 Days Ahead):
+   - Use last 7 known case values as the initial window.
+   - For each future day: predict using current window's lags,
+     append prediction, slide the window forward (pop oldest, add new).
+   - This is a rolling forecast approach.
+
+7. Final Visualization:
+   - Historical data in blue, future forecast in red dashed line.
+   - Shows both past trend and predicted trajectory.
+
+KEY CONCEPT - Why Random Forest for Time Series?
+   Random Forest is an ensemble of decision trees. While not a traditional
+   time-series model (like ARIMA), it works well when lag features are
+   engineered to capture temporal patterns in the data.
+==============================================================================
+"""
+
+################################################################################
+#                          END OF ALL EXPERIMENTS                              #
+################################################################################
